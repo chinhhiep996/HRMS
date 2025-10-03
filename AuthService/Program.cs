@@ -1,5 +1,6 @@
 using AuthService.Config;
 using AuthService.Data;
+using AuthService.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -30,9 +31,11 @@ builder.Services.AddAuthentication(options =>
             ValidateIssuerSigningKey = true,
             ValidIssuer = jwtSettings?.Issuer,
             ValidAudience = jwtSettings?.Audience,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.Issuer)),
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings!.Issuer)),
         };
     });
+
+builder.Services.AddSingleton<KafkaProducerService>();
 
 // Add services to the container.
 builder.Services.AddControllers();

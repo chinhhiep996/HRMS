@@ -2,6 +2,7 @@
 using AuthService.Data;
 using AuthService.DTOs;
 using AuthService.Models;
+using AuthService.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -18,11 +19,13 @@ namespace AuthService.Controllers
     {
         private readonly AppDbContext _context;
         private readonly JwtSettings _jwtSettings;
+        private readonly KafkaProducerService _kafkaProducer;
 
-        public AuthController(AppDbContext context, IOptions<JwtSettings> jwtOptions)
+        public AuthController(AppDbContext context, IOptions<JwtSettings> jwtOptions, KafkaProducerService kafkaProducer)
         {
             _context = context;
             _jwtSettings = jwtOptions.Value;
+            _kafkaProducer = kafkaProducer;
         }
 
         [HttpPost("register")]
@@ -42,6 +45,17 @@ namespace AuthService.Controllers
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
 
+            // Publish event
+            await _kafkaProducer.PublishAsync("user-events", new
+            {
+                Event = "UserRegister",
+                UserId = user.Id,
+                Username = user.Username,
+                Email = user.Email,
+                RoleId = user.RoleId,
+                Timestamp = DateTime.UtcNow
+            });
+
             return Ok("User registered successfully.");
         }
 
@@ -56,6 +70,16 @@ namespace AuthService.Controllers
                 return Unauthorized("Invalid username of password.");
 
             var token = GenerateJwtToken(user);
+
+            // Publish event
+            await _kafkaProducer.PublishAsync("user-events", new
+            {
+                Event = "UserLoggedIn",
+                UserId = user.Id,
+                Username = user.Username,
+                Timestamp = DateTime.UtcNow
+            });
+
             return Ok(new { Token = token });
         }
 
